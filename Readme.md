@@ -1,10 +1,11 @@
-# Squid Game Doll
+# Squid Games Doll
+
 This software runs on the Arduino UNO and is for the Squid Games doll to play red-light-green-light. 
 All I/O are used in this project.
 The pinout is attached as a Fritzing diagram. 
 
 Please watch the YouTube video on this build:
-LINK
+
 
 ELEGOO UNO R3 kit: (the kit used in this build)
 https://amzn.to/3Epuq6R
