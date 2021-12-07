@@ -5,7 +5,7 @@ All I/O are used in this project.
 The pinout is attached as a Fritzing diagram. 
 
 Please watch the YouTube video on this build:
-
+https://youtu.be/jd_4a4x3uCw
 
 ELEGOO UNO R3 kit: (the kit used in this build)
 https://amzn.to/3Epuq6R
