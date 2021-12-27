@@ -1,5 +1,3 @@
-/// CodeMakesItGo Dec 2021
-
 #include <DFPlayerMini_Fast.h>
 #include <FireTimer.h>
 #include <IRremote.h>
