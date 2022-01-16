@@ -1,12 +1,10 @@
 /// CodeMakesItGo Dec 2021
 
-#include <DFPlayerMini_Fast.h>
-#include <FireTimer.h>
-#include <IRremote.h>
-#include <LiquidCrystal_I2C.h>
-#include <SoftwareSerial.h>
-#include <SR04.h>
-#include <Wire.h>
+#include <DFPlayerMini_Fast.h> //by PowerBroker2 Version 1.2.4
+#include <FireTimer.h> //by PowerBroker2 Version 1.0.5
+#include <IRremote.h> //By Elegoo, included in this Github repo
+#include <LiquidCrystal_I2C.h> //by Marco Schwarts version 1.1.2
+#include <SR04.h> //By Elegoo, included in this Github repo
 
 /*-----( Analog Pins )-----*/
 #define BUTTONS_IN A0
