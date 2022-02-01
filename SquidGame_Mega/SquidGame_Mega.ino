@@ -3,19 +3,21 @@
 /// Program for the Arduino Mega 2560
 
 /*-----( Includes )-----*/
-#include <Servo.h> //by Arduino
+#include <Servo.h> //by Arduino, (timer 5) *comment out servoTimers.h line 36-38 to only use timer 5
 #include <DFPlayerMini_Fast.h> //by PowerBroker2 Version 1.2.4
 #include <FireTimer.h> //by PowerBroker2 Version 1.0.5
-#include <IRremote.h> //By Elegoo, included in this Github repo, (uses timer 2)
+#include <IRremote.h> //By Elegoo, included in this Github repo, (timer 2)
 #include <LiquidCrystal_I2C.h> //by Marco Schwarts version 1.1.2
 #include <SR04.h> //By Elegoo, included in this Github repo
 
 
 /*-----( Analog Pins )-----*/
-#define BUTTONS_IN A0
 #define SONAR_TRIG_PIN A1
 #define SONAR_ECHO_PIN A2
 #define MOTION_IN A3
+#define BUTTON1_IN A4
+#define BUTTON2_IN A5
+#define BUTTON3_IN A6
 
 /*-----( Digital Pins )-----*/
 #define LED_BLUE 13
@@ -43,6 +45,8 @@
 #define RED_LIGHT_MS 5000            // 5 seconds on for green light
 #define WAIT_FOR_STOP_MOTION_MS 5000 // 5 seconds to wait for motion detection to stop
 #define USING_MOTION_SENSOR false    // set to false if not using motion sensor
+#define USING_DISTANCE_SENSOR false  // set to false if not using distance sensor
+#define BUTTON_DEBOUNCE 2            // 2*50ms=100ms, amount of time a button must be held down before triggering a press
 
 /*-----( Global Variables )-----*/
 static unsigned int timer_1000ms = 0;
@@ -342,36 +346,58 @@ void updateMenuDisplay(const int button)
 
 void handleButtons()
 {
-  static int buttonPressed = 0;
-  int value = analogRead(BUTTONS_IN);
+  static long buttonPressCount[3] = {0};
+  int buttonPressed = 0;
 
-  if (value < 600) // buttons released
+  if(digitalRead(BUTTON1_IN) == LOW)
   {
-    if (buttonPressed != 0)
-      updateMenuDisplay(buttonPressed);
-
-    buttonPressed = 0;
-    return;
-  }
-  else if (value < 700)
-  {
-    Serial.println("button 1");
-    buttonPressed = 1;
-  }
-  else if (value < 900)
-  {
-    Serial.println("button 2");
-    buttonPressed = 2;
-  }
-  else if (value < 1000)
-  {
-    Serial.println("button 3");
-    buttonPressed = 3;
+    buttonPressCount[0]++;
   }
   else
   {
-    Serial.println(value);
-    buttonPressed = 0;
+    if(buttonPressCount[0] >= BUTTON_DEBOUNCE)
+    {
+      Serial.println("button 1");
+      buttonPressed = 1;
+    }
+    buttonPressCount[0] = 0;
+  }
+
+
+
+  if(digitalRead(BUTTON2_IN) == LOW)
+  {
+    buttonPressCount[1]++;
+  }
+  else
+  {
+    if(buttonPressCount[1] >= BUTTON_DEBOUNCE)
+    {
+      Serial.println("button 2");
+      buttonPressed = 2;
+    }
+    buttonPressCount[1] = 0;
+  }
+
+
+
+  if(digitalRead(BUTTON3_IN) == LOW)
+  {
+    buttonPressCount[2]++;
+  }
+  else
+  {
+    if(buttonPressCount[2] >= BUTTON_DEBOUNCE)
+    {
+      Serial.println("button 3");
+      buttonPressed = 3;
+    }
+    buttonPressCount[2] = 0;
+  }
+
+  if (buttonPressed != 0)
+  {
+      updateMenuDisplay(buttonPressed);
   }
 }
 
@@ -641,8 +667,11 @@ void playGame()
       else
       {
         // look for winner button or distance
-        if (gameInPlay == false ||
-            lastSonarValue < WIN_PROXIMITY_CM)
+        if (gameInPlay == false 
+#if USING_DISTANCE_SENSOR        
+        || lastSonarValue < WIN_PROXIMITY_CM
+#endif
+           )
         {
           sequence = 0;
           gameState = WIN;
@@ -656,6 +685,7 @@ void playGame()
           gameState = LOSE;
         }
         
+#if USING_DISTANCE_SENSOR        
         // at 2 meters play "your getting closer"
         else if (lastSonarValue < CLOSE_PROXIMITY_CM &&
             closerClipPlayed == false)
@@ -664,7 +694,7 @@ void playGame()
           dfPlayer.playFolder(1, 11);
           closerClipPlayed = true;
         }
-
+#endif
         // if less than 5 seconds play better hurry
         else if (countDown <= BETTER_HURRY_S &&
             hurryUpClipPlayed == false)
@@ -720,14 +750,17 @@ void playGame()
 
     else if (sequence == 2)
     {
-      //wait for motion to settle
+      //wait for head motion to settle
       if (lastMotion == 0 || (currentTimer - internalTimer) > WAIT_FOR_STOP_MOTION_MS)
       {
         internalTimer = millis();
         sequence++;
         Serial.println("Done settling");
       }
-      Serial.println("Waiting to settle");
+      else
+      {
+        Serial.println("Waiting to settle");
+      }
     }
 
     else if (sequence == 3)
@@ -749,9 +782,14 @@ void playGame()
         // can't push the button while red light
         // detect movement
         // detect distance change
-        if (gameInPlay == false ||
-            lastMotion == 1 ||
-            lastSonarValue < captureDistance)
+        if (gameInPlay == false 
+#if USING_MOTION_SENSOR        
+            || lastMotion == 1 
+#endif            
+#if USING_DISTANCE_SENSOR
+            || lastSonarValue < captureDistance
+#endif
+           )
         {
           Serial.println("Movement detected!");
           dfPlayer.playFolder(1, 15);
@@ -850,10 +888,15 @@ void loop() /*----( LOOP: RUNS CONSTANTLY )----*/
 
   if (task_250ms.fire())
   {
+    
+#if USING_DISTANCE_SENSOR
     handleSonar();
+#endif
+
 #if USING_MOTION_SENSOR
     handleMotion();
 #endif
+
     handleLeds();
     playGame();
     updateServoPosition();
@@ -880,11 +923,14 @@ void setupTimer()
 
 void setup()
 {
-  Serial.begin(9600);
-
+  Serial.begin(9600);  // For the serial monitor
+  Serial1.begin(9600); // For the DFPlayer
+  
   pinMode(MOTION_IN, INPUT);
-  pinMode(BUTTONS_IN, INPUT);
-  pinMode(DFPLAYER_BUSY_IN, INPUT);
+  pinMode(BUTTON1_IN, INPUT_PULLUP);
+  pinMode(BUTTON2_IN, INPUT_PULLUP);
+  pinMode(BUTTON3_IN, INPUT_PULLUP);
+  pinMode(DFPLAYER_BUSY_IN, INPUT_PULLUP);
 
   pinMode(SERVO_OUT, OUTPUT);
   pinMode(LED_RED, OUTPUT);
@@ -900,9 +946,9 @@ void setup()
   pinMode(SEGMENT_3_OUT, OUTPUT);
 
 
-  servo.attach(SERVO_OUT); //Setup Servo
+  servo.attach(SERVO_OUT); // Setup Servo
   irRecv.enableIRIn();     // Start the receiver
-  dfPlayer.begin(Serial);  // Use the standard serial stream for DfPlayer
+  dfPlayer.begin(Serial1); // Use serial 1 stream for DfPlayer
   dfPlayer.volume(VOLUME); // Set the DfPlay volume
   lcdDisplay.init();       // initialize the lcd
   lcdDisplay.backlight();  // Turn on backlight
