@@ -4,7 +4,8 @@
 #include <FireTimer.h> //by PowerBroker2 Version 1.0.5
 #include <IRremote.h> //By Elegoo, included in this Github repo
 #include <LiquidCrystal_I2C.h> //by Marco Schwarts version 1.1.2
-#include <SR04.h> //By Elegoo, included in this Github repo
+#include <HCSR04.h> // HCSR04 2.0.0 by Martin Sosic
+
 
 /*-----( Analog Pins )-----*/
 #define BUTTONS_IN A0
@@ -30,7 +31,7 @@
 #define TIMER_FREQUENCY 2000
 #define TIMER_MATCH (int)(((16E+6) / (TIMER_FREQUENCY * 64.0)) - 1)
 #define TIMER_2MS ((TIMER_FREQUENCY / 1000) * 2)
-#define VOLUME 30                    // 0-30
+#define VOLUME 15                    // 0-30
 #define BETTER_HURRY_S 5             // play clip at 5 seconds left
 #define WIN_PROXIMITY_CM 50          // cm distance for winner
 #define CLOSE_PROXIMITY_CM 100       // cm distance for close to winning
@@ -120,8 +121,10 @@ static GameStates gameState = WARMUP;
 /*-----( Class Objects )-----*/
 FireTimer task_50ms;
 FireTimer task_250ms;
+FireTimer task_500ms;
 DFPlayerMini_Fast dfPlayer;
-SR04 sonar = SR04(SONAR_ECHO_PIN, SONAR_TRIG_PIN);
+//SR04 sonar = SR04(SONAR_ECHO_PIN, SONAR_TRIG_PIN);
+UltraSonicDistanceSensor distanceSensor(SONAR_TRIG_PIN, SONAR_ECHO_PIN);
 IRrecv irRecv(IR_DIGITAL_IN);
 decode_results irResults;
 LiquidCrystal_I2C lcdDisplay(0x27, 16, 2); // 16x2 LCD display
@@ -368,21 +371,23 @@ void handleButtons()
   }
   else
   {
-    Serial.println(value);
+    //Serial.println(value);
     buttonPressed = 0;
   }
 }
 
-static int lastSonarValue = 0;
+static float lastSonarValue = 0;
 void handleSonar()
 {
-  int value = sonar.Distance();
+  //int value = sonar.Distance();
+  float distance = distanceSensor.measureDistanceCm();
 
-  if (value > lastSonarValue + sonarVariance ||
-      value < lastSonarValue - sonarVariance)
+  if(distance < 0) return;
+  if (distance > lastSonarValue + sonarVariance ||
+      distance < lastSonarValue - sonarVariance)
   {
-    Serial.println(value);
-    lastSonarValue = value;
+    Serial.println(distance);
+    lastSonarValue = distance;
   }
 }
 
@@ -458,6 +463,7 @@ void playGame()
   static bool closerClipPlayed = false;
   static bool hurryUpClipPlayed = false;
   static int captureDistance = 0;
+  static bool distanceValid = false;
   long currentTimer = internalTimer;
 
   if(isPlayingSound()) return;
@@ -586,6 +592,7 @@ void playGame()
         dfPlayer.playFolder(1, 8);
         gameState = GREENLIGHT;
         sequence = 0;
+        distanceValid = false;
       }
     }
   }
@@ -635,9 +642,13 @@ void playGame()
       }
       else
       {
+        if(lastSonarValue > CLOSE_PROXIMITY_CM)
+        {
+          distanceValid = true;
+        }
         // look for winner button or distance
         if (gameInPlay == false ||
-            lastSonarValue < WIN_PROXIMITY_CM)
+            (distanceValid && lastSonarValue < WIN_PROXIMITY_CM))
         {
           sequence = 0;
           gameState = WIN;
@@ -653,7 +664,7 @@ void playGame()
         
         // at 2 meters play "your getting closer"
         else if (lastSonarValue < CLOSE_PROXIMITY_CM &&
-            closerClipPlayed == false)
+            closerClipPlayed == false && distanceValid)
         {
           Serial.println("Getting closer!");
           dfPlayer.playFolder(1, 11);
@@ -845,12 +856,16 @@ void loop() /*----( LOOP: RUNS CONSTANTLY )----*/
 
   if (task_250ms.fire())
   {
-    handleSonar();
     handleMotion();
     handleLeds();
     playGame();
 
-    Serial.println(isPlayingSound());
+    //Serial.println(isPlayingSound());
+  }
+
+  if(task_500ms.fire())
+  {
+    handleSonar();
   }
 }
 
@@ -898,7 +913,7 @@ void setup()
   dfPlayer.volume(VOLUME); // Set the DfPlay volume
   lcdDisplay.init();       // initialize the lcd
   lcdDisplay.backlight();  // Turn on backlight
-  setupTimer();            // Start the high resolution timer ISR
+  setupTimer();            // Start the high resolution timer ISR for 7 Segment display
 
   // Display welcome message
   lcdDisplay.setCursor(0, 0);
@@ -911,4 +926,5 @@ void setup()
 
   task_50ms.begin(50);   // Start the 50ms timer task
   task_250ms.begin(250); // Start the 250ms timer task
+  task_500ms.begin(500); // Start the 250ms timer task
 }
