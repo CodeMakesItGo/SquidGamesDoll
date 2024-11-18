@@ -44,8 +44,8 @@
 #define GREEN_LIGHT_MS 3000          // 3 seconds on for green light
 #define RED_LIGHT_MS 5000            // 5 seconds on for green light
 #define WAIT_FOR_STOP_MOTION_MS 5000 // 5 seconds to wait for motion detection to stop
-#define USING_MOTION_SENSOR false    // set to false if not using motion sensor
-#define USING_DISTANCE_SENSOR false  // set to false if not using distance sensor
+#define USING_MOTION_SENSOR true    // set to false if not using motion sensor
+#define USING_DISTANCE_SENSOR true  // set to false if not using distance sensor
 #define BUTTON_DEBOUNCE 2            // 2*50ms=100ms, amount of time a button must be held down before triggering a press
 
 /*-----( Global Variables )-----*/
@@ -483,7 +483,7 @@ void playGame()
   static long internalTimer = millis();
   static bool closerClipPlayed = false;
   static bool hurryUpClipPlayed = false;
-  static int captureDistance = 0;
+  static int captureDistance;
   long currentTimer = internalTimer;
 
   if(isPlayingSound()) return;
